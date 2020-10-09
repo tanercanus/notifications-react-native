@@ -1,5 +1,5 @@
 import { StatusBar } from 'expo-status-bar';
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { StyleSheet, Button, View } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import * as Permissions from 'expo-permissions';
@@ -15,6 +15,8 @@ Notifications.setNotificationHandler({
 
 export default function App() {
 
+  const [pushToken, setPushToken] = useState();
+
   //It is added for ios, asking permission. For android we dont need it.
   useEffect(() => {
     Permissions.getAsync(Permissions.NOTIFICATIONS).then(
@@ -25,10 +27,25 @@ export default function App() {
         return statusObj;
       }
     ).then(statusObj => {
+
       if (statusObj.status !== 'granted') {
-        return;
+        throw new Error('Permission is not granted!');
       }
-    });
+    })
+      //below lines for the push notifications
+      .then(() => {
+        //the below function talks with the Expo Push Token Service --> getExpoPushTokenAsync
+        //console.log("Getting token");
+        return Notifications.getExpoPushTokenAsync();
+      })
+      .then(response => {
+        //console.log(response);
+        const token = response.data;
+        setPushToken(token);
+      })
+      .catch((err) => {
+        return null;
+      });
   }, []);
 
   useEffect(() => {
@@ -56,16 +73,35 @@ export default function App() {
   }, []);
 
   const triggerNotificationHandler = () => {
-    Notifications.scheduleNotificationAsync({
-      content: {
-        title: 'My first local notification',
-        body: 'This is the first local notification we are sending!',
-        data: { mySpecialData: 'Some text' }
+    //below 10 lines for the local notifications
+    // Notifications.scheduleNotificationAsync({
+    //   content: {
+    //     title: 'My first local notification',
+    //     body: 'This is the first local notification we are sending!',
+    //     data: { mySpecialData: 'Some text' }
+    //   },
+    //   trigger: {
+    //     seconds: 10
+    //   }
+    // });
+
+    fetch('https://exp.host/--/api/v2/push/send', {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Accept-Encoding': 'gzip, deflate',
+        'Content-Type': 'application/json'
       },
-      trigger: {
-        seconds: 10
-      }
+      body: JSON.stringify({
+        to: pushToken,
+        data: { extraData: 'Some Data' },
+        title: 'Send via the app',
+        body: 'This push notification was sent via the app!'
+      })
+    }).catch(err => {
+      console.log(err)
     });
+
   };
 
   return (
